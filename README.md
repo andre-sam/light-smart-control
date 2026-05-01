@@ -50,9 +50,13 @@ lights* input.
 - **Room-type presets** — Bedroom, Bathroom, Living/Family, Kitchen,
   Dining, Office/Study, Hallway. Each comes with sensible Kelvin +
   brightness values for every slot.
-- **Six daily slots** — `pre_dawn`, `morning`, `midday`, `afternoon`,
-  `evening`, `night`, with configurable transition times. Overnight
-  wrap is handled.
+- **Six daily anchors** — `pre_dawn`, `morning`, `midday`, `afternoon`,
+  `evening`, `night`, with configurable times. Kelvin and brightness
+  are **linearly interpolated** between anchors, so changes are smooth
+  rather than stepped at each boundary. Overnight wrap is handled.
+- **Smooth ramps** — by default, every minute each on-light glides
+  toward the next anchor with a 60s transition, so changes are
+  imperceptible.
 - **Brightness optional** — only adjust Kelvin if you'd rather control
   brightness elsewhere (e.g. via scenes or motion).
 - **Manual-override safe** — skips a light if it was changed in the
@@ -68,7 +72,8 @@ lights* input.
 
 ## Recommended values (built-in presets)
 
-Kelvin per slot, by room. Brightness defaults are also tuned per slot.
+Kelvin per anchor, by room. Brightness defaults are also tuned per
+anchor. Values *between* anchors are linearly interpolated.
 
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
@@ -125,18 +130,19 @@ Kelvin per slot, by room. Brightness defaults are also tuned per slot.
 
 ## How it works (brief)
 
-Every minute, and on each slot boundary, the automation:
+Every minute, the automation:
 
-1. Resolves the current slot from the clock.
-2. Walks every Area you mapped, collects each Area's lights via
+1. Walks every Area you mapped, collects each Area's lights via
    `area_entities()`, and tags each light with its room type.
+2. For each light, finds the two anchors bracketing the current time
+   and **linearly interpolates** Kelvin + brightness between them.
 3. For each light that's currently `on`:
    - skip if its `last_changed` is within the manual-override window;
    - skip if it doesn't support color temperature;
-   - clamp the slot's target Kelvin to the bulb's supported range;
+   - clamp the interpolated Kelvin to the bulb's supported range;
    - skip if the Kelvin delta is below tolerance;
    - call `light.turn_on` with `kelvin` (and optionally
-     `brightness_pct`) and a soft transition.
+     `brightness_pct`) and a soft transition (60s by default).
 
 That's it — no state machine, no flag entities required.
 

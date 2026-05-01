@@ -138,17 +138,23 @@ blueprint:
 
     transition_seconds:
       name: Transition (seconds)
-      default: 2
+      description: >
+        Per-call light transition. With the default 1-minute tick and a
+        60s transition, changes feel continuous (no visible step).
+      default: 60
       selector:
         number:
           min: 0
-          max: 30
-          step: 1
+          max: 300
+          step: 5
           unit_of_measurement: s
 
     min_change_kelvin:
       name: Minimum Kelvin change to act
-      default: 100
+      description: >
+        Skip a light if the desired Kelvin is within this tolerance of
+        its current value. Keep small (e.g. 25 K) for smooth ramps.
+      default: 25
       selector:
         number:
           min: 0
@@ -239,17 +245,16 @@ variables:
       evening:   [2400, 40]
       night:     [1800, 10]
 
-  # Current slot from clock time (handles overnight wrap).
-  now_t: "{{ now().strftime('%H:%M:%S') }}"
-  slot: >-
-    {%- set t = now_t -%}
-    {%- if t >= night_start or t < pre_dawn_start -%}night
-    {%- elif t >= pre_dawn_start and t < morning_start -%}pre_dawn
-    {%- elif t >= morning_start and t < midday_start -%}morning
-    {%- elif t >= midday_start and t < afternoon_start -%}midday
-    {%- elif t >= afternoon_start and t < evening_start -%}afternoon
-    {%- else -%}evening
-    {%- endif -%}
+  # --- Time helpers ---
+  # Convert each anchor "HH:MM:SS" to minutes-since-midnight so we can
+  # do simple arithmetic and linear interpolation between anchors.
+  pre_dawn_min:  "{{ (pre_dawn_start.split(':')[0]  | int) * 60 + (pre_dawn_start.split(':')[1]  | int) }}"
+  morning_min:   "{{ (morning_start.split(':')[0]   | int) * 60 + (morning_start.split(':')[1]   | int) }}"
+  midday_min:    "{{ (midday_start.split(':')[0]    | int) * 60 + (midday_start.split(':')[1]    | int) }}"
+  afternoon_min: "{{ (afternoon_start.split(':')[0] | int) * 60 + (afternoon_start.split(':')[1] | int) }}"
+  evening_min:   "{{ (evening_start.split(':')[0]   | int) * 60 + (evening_start.split(':')[1]   | int) }}"
+  night_min:     "{{ (night_start.split(':')[0]     | int) * 60 + (night_start.split(':')[1]     | int) }}"
+  now_min: "{{ now().hour * 60 + now().minute }}"
 
   # Area -> room-type mapping driven by the inputs.
   area_to_room:
@@ -286,18 +291,10 @@ variables:
     {{ ns.out }}
 
 trigger:
-  # Steady cadence — also picks up newly turned-on lights within a minute.
+  # Steady cadence — drives the interpolation. Every tick nudges each
+  # on-light a small step toward the next anchor's values.
   - platform: time_pattern
     minutes: "/1"
-  # Re-apply at each slot boundary the moment it ticks over.
-  - platform: time
-    at:
-      - !input pre_dawn_start
-      - !input morning_start
-      - !input midday_start
-      - !input afternoon_start
-      - !input evening_start
-      - !input night_start
 
 condition:
   - condition: state
@@ -311,8 +308,67 @@ action:
         - variables:
             ent: "{{ repeat.item.entity }}"
             room: "{{ repeat.item.room }}"
-            target_kelvin: "{{ presets[room][slot][0] | int }}"
-            target_brightness_pct: "{{ presets[room][slot][1] | int }}"
+
+            # --- Interpolation between the two anchors bracketing `now` ---
+            # Anchors in clock order, paired with the room's [Kelvin, brightness%].
+            anchors: >-
+              {{ [
+                [pre_dawn_min  | int, presets[room]['pre_dawn']],
+                [morning_min   | int, presets[room]['morning']],
+                [midday_min    | int, presets[room]['midday']],
+                [afternoon_min | int, presets[room]['afternoon']],
+                [evening_min   | int, presets[room]['evening']],
+                [night_min     | int, presets[room]['night']],
+              ] }}
+
+            # Find prev/next anchors around now_min, wrapping at midnight.
+            # If now is before the first anchor or after the last, the
+            # bracketing pair is (last, first+1440).
+            prev_idx: >-
+              {%- set ns = namespace(idx=-1) -%}
+              {%- for a in anchors -%}
+                {%- if (now_min | int) >= a[0] -%}
+                  {%- set ns.idx = loop.index0 -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {{ ns.idx }}
+
+            prev_a: >-
+              {{ anchors[(prev_idx | int)] if (prev_idx | int) >= 0
+                 else anchors[anchors|length - 1] }}
+            next_a: >-
+              {{ anchors[(prev_idx | int) + 1] if (prev_idx | int) >= 0
+                    and (prev_idx | int) + 1 < anchors|length
+                 else anchors[0] }}
+
+            # Effective minutes for next anchor (add 1440 if we wrapped midnight).
+            prev_min: "{{ prev_a[0] | int }}"
+            next_min_raw: "{{ next_a[0] | int }}"
+            next_min: >-
+              {{ next_min_raw if (next_min_raw | int) > (prev_min | int)
+                 else (next_min_raw | int) + 1440 }}
+
+            # Effective `now` (add 1440 if `now` is before prev_min, i.e.
+            # we wrapped through midnight on the prev side).
+            eff_now: >-
+              {{ (now_min | int) if (now_min | int) >= (prev_min | int)
+                 else (now_min | int) + 1440 }}
+
+            span: "{{ ((next_min | int) - (prev_min | int)) | int }}"
+            frac: >-
+              {{ 0 if (span | int) <= 0
+                 else (((eff_now | int) - (prev_min | int)) / (span | int)) }}
+            frac_clamped: "{{ [[frac | float, 0] | max, 1] | min }}"
+
+            target_kelvin: >-
+              {{ ((prev_a[1][0] | int)
+                  + ((next_a[1][0] | int) - (prev_a[1][0] | int))
+                    * (frac_clamped | float)) | round(0) | int }}
+            target_brightness_pct: >-
+              {{ ((prev_a[1][1] | int)
+                  + ((next_a[1][1] | int) - (prev_a[1][1] | int))
+                    * (frac_clamped | float)) | round(0) | int }}
+
             is_on: "{{ states(ent) == 'on' }}"
             current_kelvin: >-
               {{ state_attr(ent, 'color_temp_kelvin')
@@ -352,3 +408,4 @@ action:
                       data:
                         kelvin: "{{ clamped_kelvin }}"
                         transition: "{{ transition_seconds | int }}"
+
