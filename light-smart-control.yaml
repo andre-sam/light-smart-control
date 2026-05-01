@@ -1,0 +1,430 @@
+blueprint:
+  name: Light Smart Control (Adaptive Color Temperature)
+  description: >
+    Adjusts the color temperature (and optionally brightness) of one or more
+    `light.*` entities based on the time of day, tuned to the room type
+    (bedroom, bathroom, living/family room, kitchen, dining, office, hallway,
+    custom).
+
+
+    Only lights that are already ON are adjusted — the blueprint never turns
+    lights on or off. This keeps it compatible with any other automation,
+    motion-light, or manual switch you already use.
+
+
+    Schedule (relative to clock time):
+      • pre_dawn   — late night → just before sunrise   (very warm, dim)
+      • morning    — sunrise → mid-morning               (cool, bright)
+      • midday     — mid-morning → mid-afternoon         (neutral / cool)
+      • afternoon  — mid-afternoon → sunset              (neutral → warm)
+      • evening    — sunset → bedtime                    (warm, dim)
+      • night      — bedtime → pre_dawn                  (very warm, very dim)
+
+
+    Room-type presets pick sensible Kelvin / brightness defaults per slot.
+    Pick `custom` to override every value yourself.
+
+
+    Recommended ranges used by the presets (Kelvin):
+      • Bedroom        evening 2200K, night 1800K, morning 3000K
+      • Bathroom       morning/midday 5000K (grooming), evening 2400K
+      • Living / Family  midday 3500K, evening 2400K, night 2000K
+      • Kitchen        midday 4500K (task), evening 2700K
+      • Dining         always warm 2400–2700K (ambience)
+      • Office / Study midday 5000K (focus), evening 3000K
+      • Hallway        midday 3500K, night 1800K (low glare for nav)
+
+
+    Required helpers:
+      • input_boolean — master enable toggle
+
+
+  domain: automation
+  source_url: https://github.com/andre-sam/light-smart-control/blob/main/light-smart-control.yaml
+
+  input:
+    light_entities:
+      name: Light entities
+      description: One or more `light.*` entities to adjust. They must support color temperature.
+      selector:
+        entity:
+          domain: light
+          multiple: true
+
+    enable_toggle:
+      name: Master enable toggle
+      description: input_boolean to enable/disable this automation.
+      selector:
+        entity:
+          domain: input_boolean
+
+    room_type:
+      name: Room type preset
+      description: >
+        Picks Kelvin/brightness defaults appropriate for the room. Choose
+        `custom` to drive every slot from the manual inputs below.
+      default: living
+      selector:
+        select:
+          options:
+            - label: Bedroom
+              value: bedroom
+            - label: Bathroom
+              value: bathroom
+            - label: Living / Family room
+              value: living
+            - label: Kitchen
+              value: kitchen
+            - label: Dining room
+              value: dining
+            - label: Office / Study
+              value: office
+            - label: Hallway / Landing
+              value: hallway
+            - label: Custom (use manual values)
+              value: custom
+
+    # -------- Schedule --------
+    morning_start:
+      name: Morning start
+      description: When the morning slot begins (typically around sunrise).
+      default: "07:00:00"
+      selector:
+        time:
+    midday_start:
+      name: Midday start
+      default: "10:00:00"
+      selector:
+        time:
+    afternoon_start:
+      name: Afternoon start
+      default: "14:00:00"
+      selector:
+        time:
+    evening_start:
+      name: Evening start
+      description: When warm evening light kicks in (typically around sunset).
+      default: "18:30:00"
+      selector:
+        time:
+    night_start:
+      name: Night start
+      description: Bedtime — switches to the dimmest, warmest preset.
+      default: "22:30:00"
+      selector:
+        time:
+    pre_dawn_start:
+      name: Pre-dawn start
+      description: When pre-dawn (still very warm, dim) begins.
+      default: "05:30:00"
+      selector:
+        time:
+
+    # -------- Behaviour --------
+    adjust_brightness:
+      name: Also adjust brightness
+      description: >
+        If enabled, the brightness of each on-light is also nudged toward
+        the slot's recommended brightness. Disable to only change Kelvin.
+      default: true
+      selector:
+        boolean:
+
+    transition_seconds:
+      name: Transition (seconds)
+      description: Smooth transition for the `light.turn_on` call.
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 1
+          unit_of_measurement: s
+
+    min_change_kelvin:
+      name: Minimum Kelvin change to act
+      description: >
+        Skip the update if the desired Kelvin is within this tolerance of
+        the light's current value — avoids visible flicker on every run.
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 500
+          step: 25
+          unit_of_measurement: K
+
+    skip_if_recently_changed:
+      name: Skip if recently changed manually (minutes)
+      description: >
+        If the light was last changed less than N minutes ago by something
+        OTHER than this automation (e.g. user grabbed the dimmer), leave it
+        alone. Set 0 to disable the check.
+      default: 15
+      selector:
+        number:
+          min: 0
+          max: 240
+          step: 5
+          unit_of_measurement: min
+
+    # -------- Custom Kelvin overrides (used when room_type = custom) --------
+    custom_kelvin_pre_dawn:
+      name: "Custom: pre-dawn Kelvin"
+      default: 2000
+      selector:
+        number: { min: 1500, max: 6500, step: 50, unit_of_measurement: K }
+    custom_kelvin_morning:
+      name: "Custom: morning Kelvin"
+      default: 4000
+      selector:
+        number: { min: 1500, max: 6500, step: 50, unit_of_measurement: K }
+    custom_kelvin_midday:
+      name: "Custom: midday Kelvin"
+      default: 5000
+      selector:
+        number: { min: 1500, max: 6500, step: 50, unit_of_measurement: K }
+    custom_kelvin_afternoon:
+      name: "Custom: afternoon Kelvin"
+      default: 3500
+      selector:
+        number: { min: 1500, max: 6500, step: 50, unit_of_measurement: K }
+    custom_kelvin_evening:
+      name: "Custom: evening Kelvin"
+      default: 2400
+      selector:
+        number: { min: 1500, max: 6500, step: 50, unit_of_measurement: K }
+    custom_kelvin_night:
+      name: "Custom: night Kelvin"
+      default: 1800
+      selector:
+        number: { min: 1500, max: 6500, step: 50, unit_of_measurement: K }
+
+    # -------- Custom brightness overrides (0–100, used when room_type = custom) --------
+    custom_brightness_pre_dawn:
+      name: "Custom: pre-dawn brightness %"
+      default: 15
+      selector:
+        number: { min: 1, max: 100, step: 1, unit_of_measurement: "%" }
+    custom_brightness_morning:
+      name: "Custom: morning brightness %"
+      default: 80
+      selector:
+        number: { min: 1, max: 100, step: 1, unit_of_measurement: "%" }
+    custom_brightness_midday:
+      name: "Custom: midday brightness %"
+      default: 100
+      selector:
+        number: { min: 1, max: 100, step: 1, unit_of_measurement: "%" }
+    custom_brightness_afternoon:
+      name: "Custom: afternoon brightness %"
+      default: 80
+      selector:
+        number: { min: 1, max: 100, step: 1, unit_of_measurement: "%" }
+    custom_brightness_evening:
+      name: "Custom: evening brightness %"
+      default: 50
+      selector:
+        number: { min: 1, max: 100, step: 1, unit_of_measurement: "%" }
+    custom_brightness_night:
+      name: "Custom: night brightness %"
+      default: 20
+      selector:
+        number: { min: 1, max: 100, step: 1, unit_of_measurement: "%" }
+
+mode: single
+max_exceeded: silent
+
+variables:
+  light_entities: !input light_entities
+  enable_toggle: !input enable_toggle
+  room_type: !input room_type
+  morning_start: !input morning_start
+  midday_start: !input midday_start
+  afternoon_start: !input afternoon_start
+  evening_start: !input evening_start
+  night_start: !input night_start
+  pre_dawn_start: !input pre_dawn_start
+  adjust_brightness: !input adjust_brightness
+  transition_seconds: !input transition_seconds
+  min_change_kelvin: !input min_change_kelvin
+  skip_if_recently_changed: !input skip_if_recently_changed
+  custom_kelvin_pre_dawn: !input custom_kelvin_pre_dawn
+  custom_kelvin_morning: !input custom_kelvin_morning
+  custom_kelvin_midday: !input custom_kelvin_midday
+  custom_kelvin_afternoon: !input custom_kelvin_afternoon
+  custom_kelvin_evening: !input custom_kelvin_evening
+  custom_kelvin_night: !input custom_kelvin_night
+  custom_brightness_pre_dawn: !input custom_brightness_pre_dawn
+  custom_brightness_morning: !input custom_brightness_morning
+  custom_brightness_midday: !input custom_brightness_midday
+  custom_brightness_afternoon: !input custom_brightness_afternoon
+  custom_brightness_evening: !input custom_brightness_evening
+  custom_brightness_night: !input custom_brightness_night
+
+  # Room presets: [pre_dawn, morning, midday, afternoon, evening, night]
+  # values are [Kelvin, brightness%]
+  presets:
+    bedroom:
+      pre_dawn:  [1900, 10]
+      morning:   [3000, 60]
+      midday:    [3500, 80]
+      afternoon: [3000, 70]
+      evening:   [2200, 40]
+      night:     [1800, 8]
+    bathroom:
+      pre_dawn:  [2200, 20]
+      morning:   [5000, 90]
+      midday:    [5000, 100]
+      afternoon: [4000, 80]
+      evening:   [2400, 50]
+      night:     [1800, 15]
+    living:
+      pre_dawn:  [2000, 15]
+      morning:   [3500, 70]
+      midday:    [3500, 90]
+      afternoon: [3000, 75]
+      evening:   [2400, 50]
+      night:     [2000, 20]
+    kitchen:
+      pre_dawn:  [2400, 25]
+      morning:   [4000, 90]
+      midday:    [4500, 100]
+      afternoon: [3500, 85]
+      evening:   [2700, 60]
+      night:     [2000, 20]
+    dining:
+      pre_dawn:  [2200, 15]
+      morning:   [2700, 60]
+      midday:    [2700, 80]
+      afternoon: [2700, 70]
+      evening:   [2400, 50]
+      night:     [2000, 20]
+    office:
+      pre_dawn:  [3000, 30]
+      morning:   [4500, 90]
+      midday:    [5000, 100]
+      afternoon: [4000, 85]
+      evening:   [3000, 60]
+      night:     [2200, 25]
+    hallway:
+      pre_dawn:  [1800, 8]
+      morning:   [3000, 60]
+      midday:    [3500, 70]
+      afternoon: [3000, 60]
+      evening:   [2400, 40]
+      night:     [1800, 10]
+
+  # Determine current slot from clock time (handles overnight wrap).
+  now_t: "{{ now().strftime('%H:%M:%S') }}"
+  slot: >-
+    {% set t = now_t %}
+    {% if t >= night_start or t < pre_dawn_start %} night
+    {% elif t >= pre_dawn_start and t < morning_start %} pre_dawn
+    {% elif t >= morning_start and t < midday_start %} morning
+    {% elif t >= midday_start and t < afternoon_start %} midday
+    {% elif t >= afternoon_start and t < evening_start %} afternoon
+    {% else %} evening
+    {% endif %}
+
+  target_kelvin: >-
+    {% set s = slot | trim %}
+    {% if room_type == 'custom' %}
+      {{ {
+        'pre_dawn':  custom_kelvin_pre_dawn,
+        'morning':   custom_kelvin_morning,
+        'midday':    custom_kelvin_midday,
+        'afternoon': custom_kelvin_afternoon,
+        'evening':   custom_kelvin_evening,
+        'night':     custom_kelvin_night,
+      }[s] }}
+    {% else %}
+      {{ presets[room_type][s][0] }}
+    {% endif %}
+
+  target_brightness_pct: >-
+    {% set s = slot | trim %}
+    {% if room_type == 'custom' %}
+      {{ {
+        'pre_dawn':  custom_brightness_pre_dawn,
+        'morning':   custom_brightness_morning,
+        'midday':    custom_brightness_midday,
+        'afternoon': custom_brightness_afternoon,
+        'evening':   custom_brightness_evening,
+        'night':     custom_brightness_night,
+      }[s] }}
+    {% else %}
+      {{ presets[room_type][s][1] }}
+    {% endif %}
+
+trigger:
+  # Run on a steady cadence so transitions through slots are picked up.
+  - platform: time_pattern
+    minutes: "/5"
+  # Re-apply when a light is turned on, so it gets the right Kelvin immediately.
+  - platform: state
+    entity_id: !input light_entities
+    from: "off"
+    to: "on"
+  # Re-apply at each slot boundary the moment it ticks over.
+  - platform: time
+    at:
+      - !input pre_dawn_start
+      - !input morning_start
+      - !input midday_start
+      - !input afternoon_start
+      - !input evening_start
+      - !input night_start
+
+condition:
+  - condition: state
+    entity_id: !input enable_toggle
+    state: "on"
+
+action:
+  - repeat:
+      for_each: "{{ light_entities }}"
+      sequence:
+        - variables:
+            ent: "{{ repeat.item }}"
+            st: "{{ states[ent.split('.')[0]][ent.split('.')[1]] if ent else none }}"
+            is_on: "{{ states(ent) == 'on' }}"
+            current_kelvin: >-
+              {{ state_attr(ent, 'color_temp_kelvin')
+                 | default(state_attr(ent, 'kelvin'), true)
+                 | default(0, true) | int(0) }}
+            min_k: "{{ state_attr(ent, 'min_color_temp_kelvin') | default(2000, true) | int(2000) }}"
+            max_k: "{{ state_attr(ent, 'max_color_temp_kelvin') | default(6500, true) | int(6500) }}"
+            clamped_kelvin: >-
+              {{ [[target_kelvin | int, min_k] | max, max_k] | min }}
+            kelvin_delta: "{{ (clamped_kelvin - current_kelvin) | abs }}"
+            last_changed_minutes: >-
+              {{ ((now() - states[ent.split('.')[0]][ent.split('.')[1]].last_changed)
+                  .total_seconds() / 60) | round(0) if is_on else 9999 }}
+            recently_touched: >-
+              {{ skip_if_recently_changed | int > 0
+                 and last_changed_minutes < (skip_if_recently_changed | int) }}
+        - choose:
+            - conditions:
+                - "{{ is_on }}"
+                - "{{ not recently_touched }}"
+                - "{{ kelvin_delta > (min_change_kelvin | int)
+                      or (adjust_brightness and target_brightness_pct | int > 0) }}"
+              sequence:
+                - choose:
+                    - conditions: "{{ adjust_brightness }}"
+                      sequence:
+                        - service: light.turn_on
+                          target:
+                            entity_id: "{{ ent }}"
+                          data:
+                            kelvin: "{{ clamped_kelvin }}"
+                            brightness_pct: "{{ target_brightness_pct | int }}"
+                            transition: "{{ transition_seconds | int }}"
+                  default:
+                    - service: light.turn_on
+                      target:
+                        entity_id: "{{ ent }}"
+                      data:
+                        kelvin: "{{ clamped_kelvin }}"
+                        transition: "{{ transition_seconds | int }}"
