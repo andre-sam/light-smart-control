@@ -54,6 +54,10 @@ lights* input.
   `evening`, `night`, with configurable times. Kelvin and brightness
   are **linearly interpolated** between anchors, so changes are smooth
   rather than stepped at each boundary. Overnight wrap is handled.
+- **Sun-aware anchors** — optionally derive `pre_dawn`, `morning`,
+  `evening` and `night` from `sun.sun` (`next_dawn`, `next_rising`,
+  `next_setting`, `next_dusk`) plus per-anchor offsets, so the schedule
+  shifts with the seasons. `midday`/`afternoon` stay clock-based.
 - **Smooth ramps** — by default, every minute each on-light glides
   toward the next anchor with a 60s transition, so changes are
   imperceptible.

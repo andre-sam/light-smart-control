@@ -98,13 +98,59 @@ blueprint:
           multiple: true
 
     # ---------- Schedule ----------
+    use_sun_anchors:
+      name: Use sun for anchors
+      description: >
+        When enabled, `pre_dawn`, `morning`, `evening` and `night` are
+        derived from `sun.sun` (`next_dawn`, `next_rising`, `next_setting`,
+        `next_dusk`) plus per-anchor offsets, so they shift with the
+        seasons. `midday` and `afternoon` remain clock-based.
+        When disabled, the fixed clock times below are used.
+      default: false
+      selector:
+        boolean:
+
+    sun_entity:
+      name: Sun entity
+      description: Usually `sun.sun`. Used only when "Use sun for anchors" is on.
+      default: sun.sun
+      selector:
+        entity:
+          domain: sun
+
+    sun_pre_dawn_offset:
+      name: "Sun: pre-dawn offset (min)"
+      description: Minutes added to `next_dawn` (negative = earlier).
+      default: 0
+      selector:
+        number: { min: -120, max: 120, step: 5, unit_of_measurement: min }
+    sun_morning_offset:
+      name: "Sun: morning offset (min)"
+      description: Minutes added to sunrise (`next_rising`).
+      default: 0
+      selector:
+        number: { min: -120, max: 120, step: 5, unit_of_measurement: min }
+    sun_evening_offset:
+      name: "Sun: evening offset (min)"
+      description: Minutes added to sunset (`next_setting`). Negative pulls the warm shift earlier.
+      default: 0
+      selector:
+        number: { min: -120, max: 120, step: 5, unit_of_measurement: min }
+    sun_night_offset:
+      name: "Sun: night offset (min)"
+      description: Minutes added to dusk (`next_dusk`). Default +90 = bedtime ~1.5h after dusk.
+      default: 90
+      selector:
+        number: { min: -120, max: 240, step: 5, unit_of_measurement: min }
+
     pre_dawn_start:
-      name: Pre-dawn start
+      name: Pre-dawn start (clock)
+      description: Used when "Use sun for anchors" is OFF.
       default: "05:30:00"
       selector:
         time:
     morning_start:
-      name: Morning start
+      name: Morning start (clock)
       default: "07:00:00"
       selector:
         time:
@@ -119,12 +165,12 @@ blueprint:
       selector:
         time:
     evening_start:
-      name: Evening start
+      name: Evening start (clock)
       default: "18:30:00"
       selector:
         time:
     night_start:
-      name: Night start
+      name: Night start (clock)
       default: "22:30:00"
       selector:
         time:
@@ -187,6 +233,12 @@ variables:
   afternoon_start: !input afternoon_start
   evening_start: !input evening_start
   night_start: !input night_start
+  use_sun_anchors: !input use_sun_anchors
+  sun_entity: !input sun_entity
+  sun_pre_dawn_offset: !input sun_pre_dawn_offset
+  sun_morning_offset: !input sun_morning_offset
+  sun_evening_offset: !input sun_evening_offset
+  sun_night_offset: !input sun_night_offset
   adjust_brightness: !input adjust_brightness
   transition_seconds: !input transition_seconds
   min_change_kelvin: !input min_change_kelvin
@@ -246,15 +298,62 @@ variables:
       night:     [1800, 10]
 
   # --- Time helpers ---
-  # Convert each anchor "HH:MM:SS" to minutes-since-midnight so we can
-  # do simple arithmetic and linear interpolation between anchors.
-  pre_dawn_min:  "{{ (pre_dawn_start.split(':')[0]  | int) * 60 + (pre_dawn_start.split(':')[1]  | int) }}"
-  morning_min:   "{{ (morning_start.split(':')[0]   | int) * 60 + (morning_start.split(':')[1]   | int) }}"
-  midday_min:    "{{ (midday_start.split(':')[0]    | int) * 60 + (midday_start.split(':')[1]    | int) }}"
-  afternoon_min: "{{ (afternoon_start.split(':')[0] | int) * 60 + (afternoon_start.split(':')[1] | int) }}"
-  evening_min:   "{{ (evening_start.split(':')[0]   | int) * 60 + (evening_start.split(':')[1]   | int) }}"
-  night_min:     "{{ (night_start.split(':')[0]     | int) * 60 + (night_start.split(':')[1]     | int) }}"
+  # Convert each clock anchor "HH:MM:SS" to minutes-since-midnight.
+  pre_dawn_clock_min:  "{{ (pre_dawn_start.split(':')[0]  | int) * 60 + (pre_dawn_start.split(':')[1]  | int) }}"
+  morning_clock_min:   "{{ (morning_start.split(':')[0]   | int) * 60 + (morning_start.split(':')[1]   | int) }}"
+  midday_min:          "{{ (midday_start.split(':')[0]    | int) * 60 + (midday_start.split(':')[1]    | int) }}"
+  afternoon_min:       "{{ (afternoon_start.split(':')[0] | int) * 60 + (afternoon_start.split(':')[1] | int) }}"
+  evening_clock_min:   "{{ (evening_start.split(':')[0]   | int) * 60 + (evening_start.split(':')[1]   | int) }}"
+  night_clock_min:     "{{ (night_start.split(':')[0]     | int) * 60 + (night_start.split(':')[1]     | int) }}"
   now_min: "{{ now().hour * 60 + now().minute }}"
+
+  # Sun-derived minutes-of-day. We extract the local time-of-day from
+  # the `next_*` timestamps; which calendar day they fall on doesn't
+  # matter (dawn/dusk drift by only seconds day-to-day).
+  sun_dawn_min: >-
+    {%- set v = state_attr(sun_entity, 'next_dawn') -%}
+    {%- if v is not none -%}
+      {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
+      {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
+    {%- else -%}-1{%- endif -%}
+  sun_rising_min: >-
+    {%- set v = state_attr(sun_entity, 'next_rising') -%}
+    {%- if v is not none -%}
+      {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
+      {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
+    {%- else -%}-1{%- endif -%}
+  sun_setting_min: >-
+    {%- set v = state_attr(sun_entity, 'next_setting') -%}
+    {%- if v is not none -%}
+      {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
+      {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
+    {%- else -%}-1{%- endif -%}
+  sun_dusk_min: >-
+    {%- set v = state_attr(sun_entity, 'next_dusk') -%}
+    {%- if v is not none -%}
+      {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
+      {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
+    {%- else -%}-1{%- endif -%}
+
+  # Effective anchors. When sun mode is on AND the relevant attribute is
+  # available, derive from the sun and apply the per-anchor offset.
+  # Otherwise fall back to the clock anchor.
+  pre_dawn_min: >-
+    {{ (((sun_dawn_min | int) + (sun_pre_dawn_offset | int)) % 1440)
+       if use_sun_anchors and (sun_dawn_min | int) >= 0
+       else (pre_dawn_clock_min | int) }}
+  morning_min: >-
+    {{ (((sun_rising_min | int) + (sun_morning_offset | int)) % 1440)
+       if use_sun_anchors and (sun_rising_min | int) >= 0
+       else (morning_clock_min | int) }}
+  evening_min: >-
+    {{ (((sun_setting_min | int) + (sun_evening_offset | int)) % 1440)
+       if use_sun_anchors and (sun_setting_min | int) >= 0
+       else (evening_clock_min | int) }}
+  night_min: >-
+    {{ (((sun_dusk_min | int) + (sun_night_offset | int)) % 1440)
+       if use_sun_anchors and (sun_dusk_min | int) >= 0
+       else (night_clock_min | int) }}
 
   # Area -> room-type mapping driven by the inputs.
   area_to_room:
