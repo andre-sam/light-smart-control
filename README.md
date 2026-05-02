@@ -149,7 +149,7 @@ create `downlight` and `secondary`, then tag each light. New lights
 you later tag are picked up automatically.
 
 Lights without either label fall back to *Default fixture class*
-(default: `secondary`).
+(default: `downlight`).
 
 ### Downlight brightness curve
 

@@ -200,14 +200,14 @@ blueprint:
       name: Default fixture class
       description: >
         Fallback class for lights that have neither label assigned.
-      default: secondary
+      default: downlight
       selector:
         select:
           options:
-            - label: Secondary (ambient / lamp curve)
-              value: secondary
             - label: Downlight (flat / task curve)
               value: downlight
+            - label: Secondary (ambient / lamp curve)
+              value: secondary
 
     # ---------- Schedule ----------
     use_sun_anchors:
