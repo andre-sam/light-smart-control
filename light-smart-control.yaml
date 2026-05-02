@@ -84,6 +84,78 @@ blueprint:
       selector:
         area:
           multiple: true
+    staircase_areas:
+      name: Staircase areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    entry_areas:
+      name: Entry / Foyer areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    laundry_areas:
+      name: Laundry areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    garage_areas:
+      name: Garage areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    front_veranda_areas:
+      name: Front veranda areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    back_veranda_areas:
+      name: Back veranda areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    alfresco_areas:
+      name: Alfresco / Deck areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    front_yard_areas:
+      name: Front yard areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    backyard_areas:
+      name: Backyard areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    pool_areas:
+      name: Pool areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    driveway_areas:
+      name: Driveway areas
+      default: []
+      selector:
+        area:
+          multiple: true
+    shed_areas:
+      name: Shed / Workshop areas
+      default: []
+      selector:
+        area:
+          multiple: true
 
     # ---------- Excludes ----------
     excluded_lights:
@@ -296,6 +368,90 @@ variables:
       afternoon: [3000, 60]
       evening:   [2400, 40]
       night:     [1800, 10]
+    staircase:
+      pre_dawn:  [1800, 15]
+      morning:   [3000, 70]
+      midday:    [3500, 80]
+      afternoon: [3000, 70]
+      evening:   [2400, 50]
+      night:     [1800, 15]
+    entry:
+      pre_dawn:  [2000, 15]
+      morning:   [3500, 70]
+      midday:    [4000, 90]
+      afternoon: [3500, 80]
+      evening:   [2700, 60]
+      night:     [2000, 20]
+    laundry:
+      pre_dawn:  [2200, 20]
+      morning:   [4000, 90]
+      midday:    [4500, 100]
+      afternoon: [4000, 90]
+      evening:   [2700, 70]
+      night:     [2200, 30]
+    garage:
+      pre_dawn:  [2200, 30]
+      morning:   [4000, 90]
+      midday:    [5000, 100]
+      afternoon: [4000, 100]
+      evening:   [3000, 80]
+      night:     [2200, 50]
+    front_veranda:
+      pre_dawn:  [2000, 20]
+      morning:   [3500, 70]
+      midday:    [4000, 80]
+      afternoon: [3500, 70]
+      evening:   [2700, 60]
+      night:     [2200, 40]
+    back_veranda:
+      pre_dawn:  [2000, 15]
+      morning:   [3000, 60]
+      midday:    [3500, 70]
+      afternoon: [3000, 60]
+      evening:   [2400, 50]
+      night:     [2000, 25]
+    alfresco:
+      pre_dawn:  [2000, 15]
+      morning:   [3000, 60]
+      midday:    [3500, 70]
+      afternoon: [3000, 60]
+      evening:   [2400, 50]
+      night:     [2000, 25]
+    front_yard:
+      pre_dawn:  [1800, 25]
+      morning:   [3500, 70]
+      midday:    [4000, 80]
+      afternoon: [3500, 70]
+      evening:   [2700, 70]
+      night:     [2200, 50]
+    backyard:
+      pre_dawn:  [1800, 20]
+      morning:   [3000, 60]
+      midday:    [3500, 70]
+      afternoon: [3000, 60]
+      evening:   [2400, 50]
+      night:     [2000, 25]
+    pool:
+      pre_dawn:  [2000, 20]
+      morning:   [3500, 70]
+      midday:    [4000, 80]
+      afternoon: [3500, 70]
+      evening:   [2700, 60]
+      night:     [2200, 35]
+    driveway:
+      pre_dawn:  [1800, 40]
+      morning:   [3500, 80]
+      midday:    [4000, 90]
+      afternoon: [4000, 80]
+      evening:   [3000, 80]
+      night:     [2700, 60]
+    shed:
+      pre_dawn:  [2200, 40]
+      morning:   [4000, 90]
+      midday:    [5000, 100]
+      afternoon: [4500, 95]
+      evening:   [3500, 85]
+      night:     [2700, 60]
 
   # --- Time helpers ---
   # Convert each clock anchor "HH:MM:SS" to minutes-since-midnight.
@@ -364,6 +520,18 @@ variables:
     dining: !input dining_areas
     office: !input office_areas
     hallway: !input hallway_areas
+    staircase: !input staircase_areas
+    entry: !input entry_areas
+    laundry: !input laundry_areas
+    garage: !input garage_areas
+    front_veranda: !input front_veranda_areas
+    back_veranda: !input back_veranda_areas
+    alfresco: !input alfresco_areas
+    front_yard: !input front_yard_areas
+    backyard: !input backyard_areas
+    pool: !input pool_areas
+    driveway: !input driveway_areas
+    shed: !input shed_areas
 
   # Build [{entity, room}, ...] from the mapping. Filters out excluded
   # lights, lights without color-temp support, and unavailable lights.

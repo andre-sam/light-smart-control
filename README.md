@@ -79,15 +79,54 @@ lights* input.
 Kelvin per anchor, by room. Brightness defaults are also tuned per
 anchor. Values *between* anchors are linearly interpolated.
 
+**Sleeping & bathing**
+
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
 | Bedroom            | 1900     | 3000    | 3500   | 3000      | 2200    | 1800  |
-| Bathroom           | 2200     | 5000    | 5000   | 4000      | 2400    | 1800  |
+| Bathroom / ensuite | 2200     | 5000    | 5000   | 4000      | 2400    | 1800  |
+
+**Living & dining**
+
+| Room               | pre-dawn | morning | midday | afternoon | evening | night |
+|--------------------|---------:|--------:|-------:|----------:|--------:|------:|
 | Living / Family    | 2000     | 3500    | 3500   | 3000      | 2400    | 2000  |
-| Kitchen            | 2400     | 4000    | 4500   | 3500      | 2700    | 2000  |
 | Dining             | 2200     | 2700    | 2700   | 2700      | 2400    | 2000  |
+
+**Work & utility**
+
+| Room               | pre-dawn | morning | midday | afternoon | evening | night |
+|--------------------|---------:|--------:|-------:|----------:|--------:|------:|
+| Kitchen            | 2400     | 4000    | 4500   | 3500      | 2700    | 2000  |
 | Office / Study     | 3000     | 4500    | 5000   | 4000      | 3000    | 2200  |
+| Laundry            | 2200     | 4000    | 4500   | 4000      | 2700    | 2200  |
+| Garage             | 2200     | 4000    | 5000   | 4000      | 3000    | 2200  |
+
+**Circulation & transition**
+
+| Room               | pre-dawn | morning | midday | afternoon | evening | night |
+|--------------------|---------:|--------:|-------:|----------:|--------:|------:|
 | Hallway / Landing  | 1800     | 3000    | 3500   | 3000      | 2400    | 1800  |
+| Staircase          | 1800     | 3000    | 3500   | 3000      | 2400    | 1800  |
+| Entry / Foyer      | 2000     | 3500    | 4000   | 3500      | 2700    | 2000  |
+
+**Outdoor — private**
+
+| Room               | pre-dawn | morning | midday | afternoon | evening | night |
+|--------------------|---------:|--------:|-------:|----------:|--------:|------:|
+| Front veranda      | 2000     | 3500    | 4000   | 3500      | 2700    | 2200  |
+| Back veranda       | 2000     | 3000    | 3500   | 3000      | 2400    | 2000  |
+| Alfresco / Deck    | 2000     | 3000    | 3500   | 3000      | 2400    | 2000  |
+| Front yard         | 1800     | 3500    | 4000   | 3500      | 2700    | 2200  |
+| Backyard           | 1800     | 3000    | 3500   | 3000      | 2400    | 2000  |
+| Pool area          | 2000     | 3500    | 4000   | 3500      | 2700    | 2200  |
+
+**Outdoor — security & utility**
+
+| Room               | pre-dawn | morning | midday | afternoon | evening | night |
+|--------------------|---------:|--------:|-------:|----------:|--------:|------:|
+| Driveway           | 1800     | 3500    | 4000   | 4000      | 3000    | 2700  |
+| Shed / Workshop    | 2200     | 4000    | 5000   | 4500      | 3500    | 2700  |
 
 ## Requirements
 
