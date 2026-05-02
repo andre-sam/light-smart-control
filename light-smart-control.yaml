@@ -169,6 +169,46 @@ blueprint:
           domain: light
           multiple: true
 
+    # ---------- Fixture class (downlight / secondary) ----------
+    # Each light belongs to a class that determines its BRIGHTNESS curve.
+    # Kelvin still follows the per-room curve for both classes.
+    #   - downlight: ceiling/recessed task light. Stays bright through
+    #     the day, drops only late evening / night.
+    #   - secondary: ambient/lamp light. Follows the gentler circadian
+    #     wind-down (default behaviour).
+    # Class is decided by HA Labels assigned to the light. If a light has
+    # neither label, it falls back to `default_class`.
+    downlight_label:
+      name: "Label for downlights"
+      description: >
+        HA Label name (or slug) marking lights as downlights / primary
+        ceiling lights. Assign this label to every downlight in HA
+        (Settings → Areas, Labels & Zones → Labels).
+      default: downlight
+      selector:
+        text:
+
+    secondary_label:
+      name: "Label for secondary lights"
+      description: >
+        HA Label name (or slug) marking lamps / accent / secondary lights.
+      default: secondary
+      selector:
+        text:
+
+    default_class:
+      name: Default fixture class
+      description: >
+        Fallback class for lights that have neither label assigned.
+      default: secondary
+      selector:
+        select:
+          options:
+            - label: Secondary (ambient / lamp curve)
+              value: secondary
+            - label: Downlight (flat / task curve)
+              value: downlight
+
     # ---------- Schedule ----------
     use_sun_anchors:
       name: Use sun for anchors
@@ -299,6 +339,9 @@ max_exceeded: silent
 variables:
   enable_toggle: !input enable_toggle
   excluded_lights: !input excluded_lights
+  downlight_label: !input downlight_label
+  secondary_label: !input secondary_label
+  default_class: !input default_class
   pre_dawn_start: !input pre_dawn_start
   morning_start: !input morning_start
   midday_start: !input midday_start
@@ -316,8 +359,21 @@ variables:
   min_change_kelvin: !input min_change_kelvin
   skip_if_recently_changed: !input skip_if_recently_changed
 
+  # Brightness override curve for "downlight" class lights. Kelvin still
+  # comes from the per-room preset; only brightness uses this flat curve
+  # so primary ceiling lights stay useful through the day and drop only
+  # late evening / night. Indexed by anchor name.
+  downlight_brightness:
+    pre_dawn:  30
+    morning:   90
+    midday:    100
+    afternoon: 100
+    evening:   85
+    night:     50
+
   # Room presets: [pre_dawn, morning, midday, afternoon, evening, night]
-  # Each value is [Kelvin, brightness%].
+  # Each value is [Kelvin, brightness%]. Brightness here is used by the
+  # "secondary" class. Downlights override brightness with the curve above.
   presets:
     bedroom:
       pre_dawn:  [1900, 10]
@@ -577,16 +633,24 @@ action:
             room: "{{ repeat.item.room }}"
 
             # --- Interpolation between the two anchors bracketing `now` ---
-            # Anchors in clock order, paired with the room's [Kelvin, brightness%].
+            # Anchors in clock order: [minutes, slot_name, [Kelvin, secondary_brightness%]].
             anchors: >-
               {{ [
-                [pre_dawn_min  | int, presets[room]['pre_dawn']],
-                [morning_min   | int, presets[room]['morning']],
-                [midday_min    | int, presets[room]['midday']],
-                [afternoon_min | int, presets[room]['afternoon']],
-                [evening_min   | int, presets[room]['evening']],
-                [night_min     | int, presets[room]['night']],
+                [pre_dawn_min  | int, 'pre_dawn',  presets[room]['pre_dawn']],
+                [morning_min   | int, 'morning',   presets[room]['morning']],
+                [midday_min    | int, 'midday',    presets[room]['midday']],
+                [afternoon_min | int, 'afternoon', presets[room]['afternoon']],
+                [evening_min   | int, 'evening',   presets[room]['evening']],
+                [night_min     | int, 'night',     presets[room]['night']],
               ] }}
+
+            # --- Fixture class from HA labels ---
+            ent_labels: "{{ labels(ent) | default([]) | list }}"
+            fixture_class: >-
+              {%- if downlight_label in ent_labels -%}downlight
+              {%- elif secondary_label in ent_labels -%}secondary
+              {%- else -%}{{ default_class }}
+              {%- endif -%}
 
             # Find prev/next anchors around now_min, wrapping at midnight.
             # If now is before the first anchor or after the last, the
@@ -628,13 +692,20 @@ action:
             frac_clamped: "{{ [[frac | float, 0] | max, 1] | min }}"
 
             target_kelvin: >-
-              {{ ((prev_a[1][0] | int)
-                  + ((next_a[1][0] | int) - (prev_a[1][0] | int))
+              {{ ((prev_a[2][0] | int)
+                  + ((next_a[2][0] | int) - (prev_a[2][0] | int))
                     * (frac_clamped | float)) | round(0) | int }}
             target_brightness_pct: >-
-              {{ ((prev_a[1][1] | int)
-                  + ((next_a[1][1] | int) - (prev_a[1][1] | int))
-                    * (frac_clamped | float)) | round(0) | int }}
+              {%- if fixture_class == 'downlight' -%}
+                {{ ((downlight_brightness[prev_a[1]] | int)
+                    + ((downlight_brightness[next_a[1]] | int)
+                       - (downlight_brightness[prev_a[1]] | int))
+                      * (frac_clamped | float)) | round(0) | int }}
+              {%- else -%}
+                {{ ((prev_a[2][1] | int)
+                    + ((next_a[2][1] | int) - (prev_a[2][1] | int))
+                      * (frac_clamped | float)) | round(0) | int }}
+              {%- endif -%}
 
             is_on: "{{ states(ent) == 'on' }}"
             current_kelvin: >-

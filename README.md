@@ -61,6 +61,12 @@ lights* input.
 - **Smooth ramps** — by default, every minute each on-light glides
   toward the next anchor with a 60s transition, so changes are
   imperceptible.
+- **Two-layer lighting (downlights + lamps)** — tag each light with an
+  HA **Label** (`downlight` or `secondary`). Downlights use a flat
+  curve (90–100% all day, 50% at night), so they stay useful for
+  task light. Secondary lamps follow the gentler circadian wind-down.
+  Both share the same Kelvin curve. Lights without a label fall back
+  to a configurable default class.
 - **Brightness optional** — only adjust Kelvin if you'd rather control
   brightness elsewhere (e.g. via scenes or motion).
 - **Manual-override safe** — skips a light if it was changed in the
@@ -126,6 +132,35 @@ anchor. Values *between* anchors are linearly interpolated.
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
 | Driveway           | 1800     | 3500    | 4000   | 4000      | 3000    | 2700  |
 | Shed / Workshop    | 2200     | 4000    | 5000   | 4500      | 3500    | 2700  |
+
+## Two-layer lighting (downlights + secondary)
+
+If you have **primary downlights** (ceiling/recessed, doing the heavy
+lifting) plus **secondary lamps** (table/floor/accent for ambience),
+tag each light with an HA **Label**:
+
+- `downlight` — flat brightness curve, stays bright through the day,
+  drops only late evening / night. Kelvin still goes warm at night.
+- `secondary` — the gentler ambience curve (the per-room values in
+  the table above). Kelvin matches the downlights.
+
+Assign labels in HA: **Settings → Areas, Labels & Zones → Labels**,
+create `downlight` and `secondary`, then tag each light. New lights
+you later tag are picked up automatically.
+
+Lights without either label fall back to *Default fixture class*
+(default: `secondary`).
+
+### Downlight brightness curve
+
+| Anchor    | Brightness |
+|-----------|-----------:|
+| pre_dawn  | 30%        |
+| morning   | 90%        |
+| midday    | 100%       |
+| afternoon | 100%       |
+| evening   | 85%        |
+| night     | 50%        |
 
 ## Requirements
 
