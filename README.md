@@ -106,7 +106,6 @@ anchor. Values *between* anchors are linearly interpolated.
 
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
-| Hallway / Landing  | 1800     | 3000    | 3500   | 3000      | 2400    | 1800  |
 | Staircase          | 1800     | 3000    | 3500   | 3000      | 2400    | 1800  |
 | Entry / Foyer      | 2000     | 3500    | 4000   | 3500      | 2700    | 2000  |
 
