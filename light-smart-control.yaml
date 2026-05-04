@@ -818,7 +818,7 @@ action:
                           target:
                             entity_id: "{{ ent }}"
                           data:
-                            kelvin: "{{ clamped_kelvin }}"
+                            color_temp_kelvin: "{{ clamped_kelvin }}"
                             brightness_pct: "{{ target_brightness_pct }}"
                             transition: "{{ transition_seconds | int }}"
                   default:
@@ -826,6 +826,6 @@ action:
                       target:
                         entity_id: "{{ ent }}"
                       data:
-                        kelvin: "{{ clamped_kelvin }}"
+                        color_temp_kelvin: "{{ clamped_kelvin }}"
                         transition: "{{ transition_seconds | int }}"
 
