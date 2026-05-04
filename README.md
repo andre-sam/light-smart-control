@@ -5,7 +5,7 @@ temperature** (and optionally brightness) of every light in your home
 throughout the day, based on the **Area** each light is assigned to in
 Home Assistant.
 
-It only ever adjusts lights that are **already on** — it never turns
+It only ever adjusts lights that are **already on** - it never turns
 lights on or off. So it composes cleanly with motion lighting, manual
 switches, scenes, and any other automation you already have.
 
@@ -36,7 +36,7 @@ blueprint inputs:
 - *Hallway areas* → `Hallway`, `Landing`, `Stairs`, …
 
 Every `light.*` placed in those areas is automatically picked up and
-tuned with the right curve — including lights you add to those areas
+tuned with the right curve - including lights you add to those areas
 later. **No per-light wiring.**
 
 Lights without color-temperature support are ignored. You can also
@@ -45,51 +45,51 @@ lights* input.
 
 ## Features
 
-- **Area-driven** — one automation tunes every tunable-white light in
+- **Area-driven** - one automation tunes every tunable-white light in
   the home; new lights are picked up automatically.
-- **Room-type presets** — Bedroom, Bathroom, Living/Family, Kitchen,
+- **Room-type presets** - Bedroom, Bathroom, Living/Family, Kitchen,
   Dining, Office/Study, Hallway. Each comes with sensible Kelvin +
   brightness values for every slot.
-- **Six daily anchors** — `pre_dawn`, `morning`, `midday`, `afternoon`,
+- **Six daily anchors** - `pre_dawn`, `morning`, `midday`, `afternoon`,
   `evening`, `night`. Kelvin and brightness are **linearly
   interpolated** between anchors, so changes are smooth rather than
   stepped at each boundary. Overnight wrap is handled.
-- **Sun-driven schedule** — `pre_dawn`, `morning`, `evening` and
+- **Sun-driven schedule** - `pre_dawn`, `morning`, `evening` and
   `night` are derived from `sun.sun` (`next_dawn`, `next_rising`,
   `next_setting`, `next_dusk`) plus per-anchor offsets, so the
   schedule shifts with the seasons automatically. `midday` and
   `afternoon` are clock-based (the sun has no natural anchor for them).
-- **Decoupled Kelvin & brightness scheduling** —
+- **Decoupled Kelvin & brightness scheduling** -
   **Kelvin tracks the raw sun position** (best-practice circadian
   response: warm light arrives with the actual sunset, regardless of
   clock), while **brightness uses configurable clock floors/ceilings**
   on the `evening` and `night` anchors. This solves the high-latitude
   winter problem where Sydney sunset at ~17:00 in June would otherwise
-  start dimming the house mid-afternoon — lights still warm up at
+  start dimming the house mid-afternoon - lights still warm up at
   sunset, but stay near full brightness until people are actually
   winding down. Defaults: brightness `evening` clamped to 18:00–20:00,
   brightness `night` clamped to 21:30–23:00.
-- **Smooth ramps** — by default, every minute each on-light glides
+- **Smooth ramps** - by default, every minute each on-light glides
   toward the next anchor with a 60s transition, so changes are
   imperceptible.
-- **Two-layer lighting (downlights + lamps)** — tag each light with an
+- **Two-layer lighting (downlights + lamps)** - tag each light with an
   HA **Label** (`downlight` or `secondary`). Downlights use a flat
   curve (90–100% all day, 50% at night), so they stay useful for
   task light. Secondary lamps follow the gentler circadian wind-down.
   Both share the same Kelvin curve. Lights without a label fall back
   to a configurable default class.
-- **Brightness optional** — only adjust Kelvin if you'd rather control
+- **Brightness optional** - only adjust Kelvin if you'd rather control
   brightness elsewhere (e.g. via scenes or motion).
-- **Manual-override safe** — skips a light if it was changed in the
+- **Manual-override safe** - skips a light if it was changed in the
   last *N* minutes (default 15) so a manual dim isn't immediately
   overwritten.
-- **Hardware-aware** — clamps the target Kelvin to each light's own
+- **Hardware-aware** - clamps the target Kelvin to each light's own
   reported `min_color_temp_kelvin` / `max_color_temp_kelvin`, so mixing
   bulbs with different ranges (2000–6666 K, 2202–6535 K, 2900–7000 K,
   …) just works.
-- **Flicker-free** — skips updates whose Kelvin delta is below a
+- **Flicker-free** - skips updates whose Kelvin delta is below a
   configurable tolerance.
-- **Excludes** — exclude specific lights from auto-tuning.
+- **Excludes** - exclude specific lights from auto-tuning.
 
 ## Recommended values (built-in presets)
 
@@ -100,49 +100,49 @@ anchor. Values *between* anchors are linearly interpolated.
 
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
-| Bedroom            | 1900     | 3000    | 3500   | 3000      | 2200    | 1800  |
-| Bathroom / ensuite | 2200     | 5000    | 5000   | 4000      | 2400    | 1800  |
+| Bedroom            |     1900 |    3000 |   3500 |      3000 |    2200 |  1800 |
+| Bathroom / ensuite |     2200 |    5000 |   5000 |      4000 |    2400 |  1800 |
 
 **Living & dining**
 
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
-| Living / Family    | 2000     | 3500    | 3500   | 3000      | 2400    | 2000  |
-| Dining             | 2200     | 2700    | 2700   | 2700      | 2400    | 2000  |
+| Living / Family    |     2000 |    3500 |   3500 |      3000 |    2400 |  2000 |
+| Dining             |     2200 |    2700 |   2700 |      2700 |    2400 |  2000 |
 
 **Work & utility**
 
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
-| Kitchen            | 2400     | 4000    | 4500   | 3500      | 2700    | 2000  |
-| Office / Study     | 3000     | 4500    | 5000   | 4000      | 3000    | 2200  |
-| Laundry            | 2200     | 4000    | 4500   | 4000      | 2700    | 2200  |
-| Garage             | 2200     | 4000    | 5000   | 4000      | 3000    | 2200  |
+| Kitchen            |     2400 |    4000 |   4500 |      3500 |    2700 |  2000 |
+| Office / Study     |     3000 |    4500 |   5000 |      4000 |    3000 |  2200 |
+| Laundry            |     2200 |    4000 |   4500 |      4000 |    2700 |  2200 |
+| Garage             |     2200 |    4000 |   5000 |      4000 |    3000 |  2200 |
 
 **Circulation & transition**
 
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
-| Staircase          | 1800     | 3000    | 3500   | 3000      | 2400    | 1800  |
-| Entry / Foyer      | 2000     | 3500    | 4000   | 3500      | 2700    | 2000  |
+| Staircase          |     1800 |    3000 |   3500 |      3000 |    2400 |  1800 |
+| Entry / Foyer      |     2000 |    3500 |   4000 |      3500 |    2700 |  2000 |
 
-**Outdoor — private**
-
-| Room               | pre-dawn | morning | midday | afternoon | evening | night |
-|--------------------|---------:|--------:|-------:|----------:|--------:|------:|
-| Front veranda      | 2000     | 3500    | 4000   | 3500      | 2700    | 2200  |
-| Back veranda       | 2000     | 3000    | 3500   | 3000      | 2400    | 2000  |
-| Alfresco / Deck    | 2000     | 3000    | 3500   | 3000      | 2400    | 2000  |
-| Front yard         | 1800     | 3500    | 4000   | 3500      | 2700    | 2200  |
-| Backyard           | 1800     | 3000    | 3500   | 3000      | 2400    | 2000  |
-| Pool area          | 2000     | 3500    | 4000   | 3500      | 2700    | 2200  |
-
-**Outdoor — security & utility**
+**Outdoor - private**
 
 | Room               | pre-dawn | morning | midday | afternoon | evening | night |
 |--------------------|---------:|--------:|-------:|----------:|--------:|------:|
-| Driveway           | 1800     | 3500    | 4000   | 4000      | 3000    | 2700  |
-| Shed / Workshop    | 2200     | 4000    | 5000   | 4500      | 3500    | 2700  |
+| Front veranda      |     2000 |    3500 |   4000 |      3500 |    2700 |  2200 |
+| Back veranda       |     2000 |    3000 |   3500 |      3000 |    2400 |  2000 |
+| Alfresco / Deck    |     2000 |    3000 |   3500 |      3000 |    2400 |  2000 |
+| Front yard         |     1800 |    3500 |   4000 |      3500 |    2700 |  2200 |
+| Backyard           |     1800 |    3000 |   3500 |      3000 |    2400 |  2000 |
+| Pool area          |     2000 |    3500 |   4000 |      3500 |    2700 |  2200 |
+
+**Outdoor - security & utility**
+
+| Room               | pre-dawn | morning | midday | afternoon | evening | night |
+|--------------------|---------:|--------:|-------:|----------:|--------:|------:|
+| Driveway           |     1800 |    3500 |   4000 |      4000 |    3000 |  2700 |
+| Shed / Workshop    |     2200 |    4000 |   5000 |      4500 |    3500 |  2700 |
 
 ## Two-layer lighting (downlights + secondary)
 
@@ -150,9 +150,9 @@ If you have **primary downlights** (ceiling/recessed, doing the heavy
 lifting) plus **secondary lamps** (table/floor/accent for ambience),
 tag each light with an HA **Label**:
 
-- `downlight` — flat brightness curve, stays bright through the day,
+- `downlight` - flat brightness curve, stays bright through the day,
   drops only late evening / night. Kelvin still goes warm at night.
-- `secondary` — the gentler ambience curve (the per-room values in
+- `secondary` - the gentler ambience curve (the per-room values in
   the table above). Kelvin matches the downlights.
 
 Assign labels in HA: **Settings → Areas, Labels & Zones → Labels**,
@@ -176,8 +176,10 @@ Lights without either label fall back to *Default fixture class*
 ## Requirements
 
 - Lights with color-temperature support (`light.turn_on` with
-  `kelvin`). Most modern tunable-white smart bulbs (Hue, Wiz, IKEA
-  Tradfri, Shelly RGBW, Tuya CCT, Zigbee2MQTT, etc.) qualify.
+  `color_temp_kelvin`). Most modern tunable-white smart bulbs qualify
+  (e.g. Philips Hue, WiZ, IKEA Tradfri, Shelly RGBW, Tuya CCT), via
+  any Home Assistant integration (Zigbee2MQTT, ZHA, Matter, native
+  cloud integrations, etc.).
 - Each light must be assigned to an **Area** in Home Assistant.
 - One `input_boolean` to act as the master enable toggle.
 - A **sun entity** (`sun.*`). Home Assistant ships with `sun.sun` out
@@ -197,7 +199,7 @@ Lights without either label fall back to *Default fixture class*
 1. Copy [light-smart-control.yaml](light-smart-control.yaml) into
    `config/blueprints/automation/light-smart-control/` on your Home
    Assistant instance.
-2. **Settings → Automations & Scenes → Blueprints** — the blueprint
+2. **Settings → Automations & Scenes → Blueprints** - the blueprint
    should appear as *"Light Smart Control (Adaptive Color
    Temperature)"*.
 3. Click **Create Automation** from the blueprint, assign each Area
@@ -207,7 +209,7 @@ Lights without either label fall back to *Default fixture class*
 
 - **Assign Areas first.** Before creating the automation, make sure
   every relevant light is assigned to an Area. New lights you later
-  assign to a mapped Area are picked up automatically — no blueprint
+  assign to a mapped Area are picked up automatically - no blueprint
   edit needed.
 - **One automation is enough.** You only need a single instance for
   the whole house. Re-instantiate only if you want e.g. different
@@ -237,7 +239,7 @@ Every minute, the automation:
    - call `light.turn_on` with `kelvin` (and optionally
      `brightness_pct`) and a soft transition (60s by default).
 
-That's it — no state machine, no flag entities required.
+That's it - no state machine, no flag entities required.
 
 ## License
 
