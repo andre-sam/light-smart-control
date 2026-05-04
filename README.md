@@ -58,6 +58,16 @@ lights* input.
   `evening` and `night` from `sun.sun` (`next_dawn`, `next_rising`,
   `next_setting`, `next_dusk`) plus per-anchor offsets, so the schedule
   shifts with the seasons. `midday`/`afternoon` stay clock-based.
+- **Decoupled Kelvin & brightness scheduling** — when sun mode is on,
+  **Kelvin tracks the raw sun position** (best-practice circadian
+  response: warm light arrives with the actual sunset, regardless of
+  clock), while **brightness uses configurable clock floors/ceilings**
+  on the `evening` and `night` anchors. This solves the high-latitude
+  winter problem where Sydney sunset at ~17:00 in June would otherwise
+  start dimming the house mid-afternoon — lights still warm up at
+  sunset, but stay near full brightness until people are actually
+  winding down. Defaults: brightness `evening` clamped to 18:00–20:00,
+  brightness `night` clamped to 21:30–23:00.
 - **Smooth ramps** — by default, every minute each on-light glides
   toward the next anchor with a 60s transition, so changes are
   imperceptible.

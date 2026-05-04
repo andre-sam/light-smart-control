@@ -255,6 +255,56 @@ blueprint:
       selector:
         number: { min: -120, max: 240, step: 5, unit_of_measurement: min }
 
+    # ---------- Seasonal clamps for sun-anchored evening / night ----------
+    # IMPORTANT: these clamps apply ONLY to the BRIGHTNESS schedule.
+    # Kelvin always tracks the raw sun position (best-practice circadian
+    # response — warm light should arrive with sunset regardless of clock).
+    # Brightness, however, is a behavioural concern: in Sydney sunset moves
+    # ~2.5h between June and December, and without clamps the dim-down
+    # starts mid-afternoon in winter (sunset ~17:00) which feels wrong
+    # while people are still cooking / having dinner. These four inputs
+    # floor and ceiling the BRIGHTNESS evening/night anchors so the
+    # wind-down stays at a socially sane hour year-round, while Kelvin
+    # continues to follow the sun. They apply ONLY when "Use sun for
+    # anchors" is on; when sun mode is off the fixed clock anchors above
+    # are used as-is.
+    evening_earliest:
+      name: "Evening brightness: earliest clock time (sun mode)"
+      description: >
+        Sun-derived `evening` anchor for BRIGHTNESS is never earlier
+        than this. Kelvin still tracks the raw sun. Use to stop early
+        winter sunsets from dimming the house before family dinner time.
+      default: "18:00:00"
+      selector:
+        time:
+    evening_latest:
+      name: "Evening brightness: latest clock time (sun mode)"
+      description: >
+        Sun-derived `evening` anchor for BRIGHTNESS is never later
+        than this. Caps the start of the brightness wind-down on long
+        summer evenings.
+      default: "20:00:00"
+      selector:
+        time:
+    night_earliest:
+      name: "Night brightness: earliest clock time (sun mode)"
+      description: >
+        Sun-derived `night` anchor for BRIGHTNESS is never earlier than
+        this. Stops the deep dim "bedtime" brightness from triggering
+        too early in winter. Kelvin still tracks the raw sun.
+      default: "21:30:00"
+      selector:
+        time:
+    night_latest:
+      name: "Night brightness: latest clock time (sun mode)"
+      description: >
+        Sun-derived `night` anchor for BRIGHTNESS is never later than
+        this. Caps the bedtime brightness drop to a reasonable hour on
+        long summer evenings.
+      default: "23:00:00"
+      selector:
+        time:
+
     pre_dawn_start:
       name: Pre-dawn start (clock)
       description: Used when "Use sun for anchors" is OFF.
@@ -354,6 +404,10 @@ variables:
   sun_morning_offset: !input sun_morning_offset
   sun_evening_offset: !input sun_evening_offset
   sun_night_offset: !input sun_night_offset
+  evening_earliest: !input evening_earliest
+  evening_latest: !input evening_latest
+  night_earliest: !input night_earliest
+  night_latest: !input night_latest
   adjust_brightness: !input adjust_brightness
   transition_seconds: !input transition_seconds
   min_change_kelvin: !input min_change_kelvin
@@ -517,6 +571,11 @@ variables:
   afternoon_min:       "{{ (afternoon_start.split(':')[0] | int) * 60 + (afternoon_start.split(':')[1] | int) }}"
   evening_clock_min:   "{{ (evening_start.split(':')[0]   | int) * 60 + (evening_start.split(':')[1]   | int) }}"
   night_clock_min:     "{{ (night_start.split(':')[0]     | int) * 60 + (night_start.split(':')[1]     | int) }}"
+  # Seasonal-clamp clock times (sun mode only).
+  evening_earliest_min: "{{ (evening_earliest.split(':')[0] | int) * 60 + (evening_earliest.split(':')[1] | int) }}"
+  evening_latest_min:   "{{ (evening_latest.split(':')[0]   | int) * 60 + (evening_latest.split(':')[1]   | int) }}"
+  night_earliest_min:   "{{ (night_earliest.split(':')[0]   | int) * 60 + (night_earliest.split(':')[1]   | int) }}"
+  night_latest_min:     "{{ (night_latest.split(':')[0]     | int) * 60 + (night_latest.split(':')[1]     | int) }}"
   now_min: "{{ now().hour * 60 + now().minute }}"
 
   # Sun-derived minutes-of-day. We extract the local time-of-day from
@@ -558,14 +617,42 @@ variables:
     {{ (((sun_rising_min | int) + (sun_morning_offset | int)) % 1440)
        if use_sun_anchors and (sun_rising_min | int) >= 0
        else (morning_clock_min | int) }}
-  evening_min: >-
-    {{ (((sun_setting_min | int) + (sun_evening_offset | int)) % 1440)
+  # Sun-derived raw values (before any clamp).
+  evening_sun_raw: >-
+    {{ ((sun_setting_min | int) + (sun_evening_offset | int)) % 1440 }}
+  night_sun_raw: >-
+    {{ ((sun_dusk_min | int) + (sun_night_offset | int)) % 1440 }}
+
+  # --- KELVIN anchors: raw sun position, no seasonal clamp. ---
+  # Best-practice circadian response: warm light should arrive with the
+  # actual sunset, regardless of clock.
+  evening_min_k: >-
+    {{ (evening_sun_raw | int)
        if use_sun_anchors and (sun_setting_min | int) >= 0
        else (evening_clock_min | int) }}
-  night_min: >-
-    {{ (((sun_dusk_min | int) + (sun_night_offset | int)) % 1440)
+  night_min_k: >-
+    {{ (night_sun_raw | int)
        if use_sun_anchors and (sun_dusk_min | int) >= 0
        else (night_clock_min | int) }}
+
+  # --- BRIGHTNESS anchors: sun-derived but clamped between the
+  # configured earliest/latest clock floors/ceilings, so the dim-down
+  # doesn't kick in mid-afternoon in winter or push past midnight in
+  # summer. Kelvin and brightness are interpolated independently. ---
+  evening_min_b: >-
+    {%- if use_sun_anchors and (sun_setting_min | int) >= 0 -%}
+      {{ [[evening_sun_raw | int, evening_earliest_min | int] | max,
+          evening_latest_min | int] | min }}
+    {%- else -%}
+      {{ evening_clock_min | int }}
+    {%- endif -%}
+  night_min_b: >-
+    {%- if use_sun_anchors and (sun_dusk_min | int) >= 0 -%}
+      {{ [[night_sun_raw | int, night_earliest_min | int] | max,
+          night_latest_min | int] | min }}
+    {%- else -%}
+      {{ night_clock_min | int }}
+    {%- endif -%}
 
   # Area -> room-type mapping driven by the inputs.
   area_to_room:
@@ -632,16 +719,29 @@ action:
             ent: "{{ repeat.item.entity }}"
             room: "{{ repeat.item.room }}"
 
-            # --- Interpolation between the two anchors bracketing `now` ---
-            # Anchors in clock order: [minutes, slot_name, [Kelvin, secondary_brightness%]].
-            anchors: >-
+            # --- Two parallel anchor lists ---
+            # Kelvin tracks raw sun position (best-practice circadian).
+            # Brightness uses sun-derived but clock-clamped evening/night
+            # times so the dim-down doesn't kick in mid-afternoon in
+            # winter. pre_dawn/morning/midday/afternoon are shared.
+            # Each entry: [minutes, slot_name, [Kelvin, secondary_brightness%]].
+            anchors_k: >-
               {{ [
-                [pre_dawn_min  | int, 'pre_dawn',  presets[room]['pre_dawn']],
-                [morning_min   | int, 'morning',   presets[room]['morning']],
-                [midday_min    | int, 'midday',    presets[room]['midday']],
-                [afternoon_min | int, 'afternoon', presets[room]['afternoon']],
-                [evening_min   | int, 'evening',   presets[room]['evening']],
-                [night_min     | int, 'night',     presets[room]['night']],
+                [pre_dawn_min   | int, 'pre_dawn',  presets[room]['pre_dawn']],
+                [morning_min    | int, 'morning',   presets[room]['morning']],
+                [midday_min     | int, 'midday',    presets[room]['midday']],
+                [afternoon_min  | int, 'afternoon', presets[room]['afternoon']],
+                [evening_min_k  | int, 'evening',   presets[room]['evening']],
+                [night_min_k    | int, 'night',     presets[room]['night']],
+              ] }}
+            anchors_b: >-
+              {{ [
+                [pre_dawn_min   | int, 'pre_dawn',  presets[room]['pre_dawn']],
+                [morning_min    | int, 'morning',   presets[room]['morning']],
+                [midday_min     | int, 'midday',    presets[room]['midday']],
+                [afternoon_min  | int, 'afternoon', presets[room]['afternoon']],
+                [evening_min_b  | int, 'evening',   presets[room]['evening']],
+                [night_min_b    | int, 'night',     presets[room]['night']],
               ] }}
 
             # --- Fixture class from HA labels ---
@@ -652,59 +752,85 @@ action:
               {%- else -%}{{ default_class }}
               {%- endif -%}
 
-            # Find prev/next anchors around now_min, wrapping at midnight.
-            # If now is before the first anchor or after the last, the
-            # bracketing pair is (last, first+1440).
-            prev_idx: >-
+            # Find prev/next anchors around now_min for the KELVIN list,
+            # wrapping at midnight. If now is before the first anchor or
+            # after the last, the bracketing pair is (last, first+1440).
+            prev_idx_k: >-
               {%- set ns = namespace(idx=-1) -%}
-              {%- for a in anchors -%}
+              {%- for a in anchors_k -%}
                 {%- if (now_min | int) >= a[0] -%}
                   {%- set ns.idx = loop.index0 -%}
                 {%- endif -%}
               {%- endfor -%}
               {{ ns.idx }}
-
-            prev_a: >-
-              {{ anchors[(prev_idx | int)] if (prev_idx | int) >= 0
-                 else anchors[anchors|length - 1] }}
-            next_a: >-
-              {{ anchors[(prev_idx | int) + 1] if (prev_idx | int) >= 0
-                    and (prev_idx | int) + 1 < anchors|length
-                 else anchors[0] }}
-
-            # Effective minutes for next anchor (add 1440 if we wrapped midnight).
-            prev_min: "{{ prev_a[0] | int }}"
-            next_min_raw: "{{ next_a[0] | int }}"
-            next_min: >-
-              {{ next_min_raw if (next_min_raw | int) > (prev_min | int)
-                 else (next_min_raw | int) + 1440 }}
-
-            # Effective `now` (add 1440 if `now` is before prev_min, i.e.
-            # we wrapped through midnight on the prev side).
-            eff_now: >-
-              {{ (now_min | int) if (now_min | int) >= (prev_min | int)
+            prev_ak: >-
+              {{ anchors_k[(prev_idx_k | int)] if (prev_idx_k | int) >= 0
+                 else anchors_k[anchors_k|length - 1] }}
+            next_ak: >-
+              {{ anchors_k[(prev_idx_k | int) + 1] if (prev_idx_k | int) >= 0
+                    and (prev_idx_k | int) + 1 < anchors_k|length
+                 else anchors_k[0] }}
+            prev_min_k: "{{ prev_ak[0] | int }}"
+            next_min_k_raw: "{{ next_ak[0] | int }}"
+            next_min_k: >-
+              {{ next_min_k_raw if (next_min_k_raw | int) > (prev_min_k | int)
+                 else (next_min_k_raw | int) + 1440 }}
+            eff_now_k: >-
+              {{ (now_min | int) if (now_min | int) >= (prev_min_k | int)
                  else (now_min | int) + 1440 }}
+            span_k: "{{ ((next_min_k | int) - (prev_min_k | int)) | int }}"
+            frac_k: >-
+              {{ 0 if (span_k | int) <= 0
+                 else (((eff_now_k | int) - (prev_min_k | int)) / (span_k | int)) }}
+            frac_k_clamped: "{{ [[frac_k | float, 0] | max, 1] | min }}"
 
-            span: "{{ ((next_min | int) - (prev_min | int)) | int }}"
-            frac: >-
-              {{ 0 if (span | int) <= 0
-                 else (((eff_now | int) - (prev_min | int)) / (span | int)) }}
-            frac_clamped: "{{ [[frac | float, 0] | max, 1] | min }}"
+            # Same prev/next/frac calculation for the BRIGHTNESS list.
+            prev_idx_b: >-
+              {%- set ns = namespace(idx=-1) -%}
+              {%- for a in anchors_b -%}
+                {%- if (now_min | int) >= a[0] -%}
+                  {%- set ns.idx = loop.index0 -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {{ ns.idx }}
+            prev_ab: >-
+              {{ anchors_b[(prev_idx_b | int)] if (prev_idx_b | int) >= 0
+                 else anchors_b[anchors_b|length - 1] }}
+            next_ab: >-
+              {{ anchors_b[(prev_idx_b | int) + 1] if (prev_idx_b | int) >= 0
+                    and (prev_idx_b | int) + 1 < anchors_b|length
+                 else anchors_b[0] }}
+            prev_min_b: "{{ prev_ab[0] | int }}"
+            next_min_b_raw: "{{ next_ab[0] | int }}"
+            next_min_b: >-
+              {{ next_min_b_raw if (next_min_b_raw | int) > (prev_min_b | int)
+                 else (next_min_b_raw | int) + 1440 }}
+            eff_now_b: >-
+              {{ (now_min | int) if (now_min | int) >= (prev_min_b | int)
+                 else (now_min | int) + 1440 }}
+            span_b: "{{ ((next_min_b | int) - (prev_min_b | int)) | int }}"
+            frac_b: >-
+              {{ 0 if (span_b | int) <= 0
+                 else (((eff_now_b | int) - (prev_min_b | int)) / (span_b | int)) }}
+            frac_b_clamped: "{{ [[frac_b | float, 0] | max, 1] | min }}"
 
+            # Kelvin interpolated against the (sun-driven) kelvin anchors.
             target_kelvin: >-
-              {{ ((prev_a[2][0] | int)
-                  + ((next_a[2][0] | int) - (prev_a[2][0] | int))
-                    * (frac_clamped | float)) | round(0) | int }}
+              {{ ((prev_ak[2][0] | int)
+                  + ((next_ak[2][0] | int) - (prev_ak[2][0] | int))
+                    * (frac_k_clamped | float)) | round(0) | int }}
+            # Brightness interpolated against the (clock-clamped)
+            # brightness anchors, so winter sunsets don't dim too early.
             target_brightness_pct: >-
               {%- if fixture_class == 'downlight' -%}
-                {{ ((downlight_brightness[prev_a[1]] | int)
-                    + ((downlight_brightness[next_a[1]] | int)
-                       - (downlight_brightness[prev_a[1]] | int))
-                      * (frac_clamped | float)) | round(0) | int }}
+                {{ ((downlight_brightness[prev_ab[1]] | int)
+                    + ((downlight_brightness[next_ab[1]] | int)
+                       - (downlight_brightness[prev_ab[1]] | int))
+                      * (frac_b_clamped | float)) | round(0) | int }}
               {%- else -%}
-                {{ ((prev_a[2][1] | int)
-                    + ((next_a[2][1] | int) - (prev_a[2][1] | int))
-                      * (frac_clamped | float)) | round(0) | int }}
+                {{ ((prev_ab[2][1] | int)
+                    + ((next_ab[2][1] | int) - (prev_ab[2][1] | int))
+                      * (frac_b_clamped | float)) | round(0) | int }}
               {%- endif -%}
 
             is_on: "{{ states(ent) == 'on' }}"
