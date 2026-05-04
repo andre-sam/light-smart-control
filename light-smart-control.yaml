@@ -210,11 +210,14 @@ blueprint:
               value: secondary
 
     # ---------- Schedule ----------
-    # `pre_dawn`, `morning`, `evening` and `night` are always derived
-    # from a sun entity (`next_dawn`, `next_rising`, `next_setting`,
-    # `next_dusk`) plus per-anchor offsets below, so the schedule
-    # shifts with the seasons. `midday` and `afternoon` are clock-based
-    # because the sun has no natural anchor for them.
+    # All six anchors are derived from a sun entity:
+    #   pre_dawn   <- next_dawn    + sun_pre_dawn_offset
+    #   morning    <- next_rising  + sun_morning_offset
+    #   midday     <- next_noon    - peak_half_width_hours
+    #   afternoon  <- next_noon    + peak_half_width_hours
+    #   evening    <- next_setting + sun_evening_offset
+    #   night      <- next_dusk    + sun_night_offset
+    # so the schedule shifts naturally with the seasons (and DST).
     sun_entity:
       name: Sun entity
       description: >
@@ -251,6 +254,20 @@ blueprint:
       default: 90
       selector:
         number: { min: -120, max: 240, step: 5, unit_of_measurement: min }
+
+    peak_half_width_hours:
+      name: "Peak plateau half-width (hours)"
+      description: >-
+        Half-width of the bright "peak" plateau around solar noon.
+        `midday` is anchored at `next_noon - peak_half_width_hours` and
+        `afternoon` at `next_noon + peak_half_width_hours`. With the
+        default 2.5h and Sydney's solar noon (~11:50 winter, ~13:05
+        summer with DST), the plateau runs roughly 09:20-14:20 in
+        winter and 10:35-15:35 in summer. Wider = lights stay at peak
+        longer; narrower = earlier wind-down.
+      default: 2.5
+      selector:
+        number: { min: 1, max: 4, step: 0.25, unit_of_measurement: h }
 
     # ---------- Seasonal clamps for evening / night BRIGHTNESS ----------
     # IMPORTANT: these clamps apply ONLY to the BRIGHTNESS schedule.
@@ -297,23 +314,6 @@ blueprint:
         this. Caps the bedtime brightness drop to a reasonable hour on
         long summer evenings.
       default: "23:00:00"
-      selector:
-        time:
-
-    midday_start:
-      name: Midday start (clock)
-      description: >
-        Clock time for the `midday` anchor. The sun has no natural
-        anchor here, so this stays clock-based.
-      default: "10:00:00"
-      selector:
-        time:
-    afternoon_start:
-      name: Afternoon start (clock)
-      description: >
-        Clock time for the `afternoon` anchor. The sun has no natural
-        anchor here, so this stays clock-based.
-      default: "14:00:00"
       selector:
         time:
 
@@ -372,13 +372,12 @@ variables:
   downlight_label: !input downlight_label
   secondary_label: !input secondary_label
   default_class: !input default_class
-  midday_start: !input midday_start
-  afternoon_start: !input afternoon_start
   sun_entity: !input sun_entity
   sun_pre_dawn_offset: !input sun_pre_dawn_offset
   sun_morning_offset: !input sun_morning_offset
   sun_evening_offset: !input sun_evening_offset
   sun_night_offset: !input sun_night_offset
+  peak_half_width_hours: !input peak_half_width_hours
   evening_earliest: !input evening_earliest
   evening_latest: !input evening_latest
   night_earliest: !input night_earliest
@@ -539,10 +538,8 @@ variables:
       night:     [2700, 60]
 
   # --- Time helpers ---
-  # midday and afternoon are the only clock-based anchors; the rest
-  # come from sun.sun.
-  midday_min:    "{{ (midday_start.split(':')[0]    | int) * 60 + (midday_start.split(':')[1]    | int) }}"
-  afternoon_min: "{{ (afternoon_start.split(':')[0] | int) * 60 + (afternoon_start.split(':')[1] | int) }}"
+  # All anchors are sun-derived. midday/afternoon come from solar noon
+  # ± peak_half_width_hours (see below).
   # Brightness clamp clock times (sun-derived evening/night only).
   evening_earliest_min: "{{ (evening_earliest.split(':')[0] | int) * 60 + (evening_earliest.split(':')[1] | int) }}"
   evening_latest_min:   "{{ (evening_latest.split(':')[0]   | int) * 60 + (evening_latest.split(':')[1]   | int) }}"
@@ -579,14 +576,24 @@ variables:
       {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
       {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
     {%- else -%}1140{%- endif -%}
+  sun_noon_min: >-
+    {%- set v = state_attr(sun_entity, 'next_noon') -%}
+    {%- if v is not none -%}
+      {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
+      {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
+    {%- else -%}720{%- endif -%}
 
-  # Effective anchors. pre_dawn / morning / evening / night are always
-  # sun-derived (with per-anchor offsets). midday and afternoon stay
-  # clock-based.
+  # Effective anchors. All six derive from sun.sun:
+  #   pre_dawn / morning / evening / night use per-anchor offsets,
+  #   midday / afternoon use solar noon ± peak_half_width_hours.
   pre_dawn_min: >-
     {{ ((sun_dawn_min   | int) + (sun_pre_dawn_offset | int)) % 1440 }}
   morning_min: >-
     {{ ((sun_rising_min | int) + (sun_morning_offset  | int)) % 1440 }}
+  midday_min: >-
+    {{ ((sun_noon_min | int) - ((peak_half_width_hours | float) * 60) | int) % 1440 }}
+  afternoon_min: >-
+    {{ ((sun_noon_min | int) + ((peak_half_width_hours | float) * 60) | int) % 1440 }}
   # Sun-derived raw values (before any brightness clamp).
   evening_sun_raw: >-
     {{ ((sun_setting_min | int) + (sun_evening_offset | int)) % 1440 }}

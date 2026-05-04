@@ -54,11 +54,13 @@ lights* input.
   `evening`, `night`. Kelvin and brightness are **linearly
   interpolated** between anchors, so changes are smooth rather than
   stepped at each boundary. Overnight wrap is handled.
-- **Sun-driven schedule** - `pre_dawn`, `morning`, `evening` and
-  `night` are derived from `sun.sun` (`next_dawn`, `next_rising`,
-  `next_setting`, `next_dusk`) plus per-anchor offsets, so the
-  schedule shifts with the seasons automatically. `midday` and
-  `afternoon` are clock-based (the sun has no natural anchor for them).
+- **Sun-driven schedule** - all six anchors derive from `sun.sun`:
+  `pre_dawn` from `next_dawn`, `morning` from `next_rising`,
+  `evening` from `next_setting`, `night` from `next_dusk` (each plus
+  a per-anchor offset). `midday` and `afternoon` are anchored
+  symmetrically around solar noon (`next_noon ± peak_half_width_hours`,
+  default ±2.5h). The whole schedule shifts naturally with the
+  seasons and DST.
 - **Decoupled Kelvin & brightness scheduling** -
   **Kelvin tracks the raw sun position** (best-practice circadian
   response: warm light arrives with the actual sunset, regardless of
