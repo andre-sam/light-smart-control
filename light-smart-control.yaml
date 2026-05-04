@@ -210,21 +210,18 @@ blueprint:
               value: secondary
 
     # ---------- Schedule ----------
-    use_sun_anchors:
-      name: Use sun for anchors
-      description: >
-        When enabled, `pre_dawn`, `morning`, `evening` and `night` are
-        derived from `sun.sun` (`next_dawn`, `next_rising`, `next_setting`,
-        `next_dusk`) plus per-anchor offsets, so they shift with the
-        seasons. `midday` and `afternoon` remain clock-based.
-        When disabled, the fixed clock times below are used.
-      default: false
-      selector:
-        boolean:
-
+    # `pre_dawn`, `morning`, `evening` and `night` are always derived
+    # from a sun entity (`next_dawn`, `next_rising`, `next_setting`,
+    # `next_dusk`) plus per-anchor offsets below, so the schedule
+    # shifts with the seasons. `midday` and `afternoon` are clock-based
+    # because the sun has no natural anchor for them.
     sun_entity:
       name: Sun entity
-      description: Usually `sun.sun`. Used only when "Use sun for anchors" is on.
+      description: >
+        The `sun.*` entity to read dawn/sunrise/sunset/dusk from.
+        Home Assistant ships with `sun.sun` out of the box — that's
+        almost always the right choice. Override only if you maintain
+        a custom sun entity (e.g. for a different location).
       default: sun.sun
       selector:
         entity:
@@ -255,7 +252,7 @@ blueprint:
       selector:
         number: { min: -120, max: 240, step: 5, unit_of_measurement: min }
 
-    # ---------- Seasonal clamps for sun-anchored evening / night ----------
+    # ---------- Seasonal clamps for evening / night BRIGHTNESS ----------
     # IMPORTANT: these clamps apply ONLY to the BRIGHTNESS schedule.
     # Kelvin always tracks the raw sun position (best-practice circadian
     # response — warm light should arrive with sunset regardless of clock).
@@ -265,11 +262,9 @@ blueprint:
     # while people are still cooking / having dinner. These four inputs
     # floor and ceiling the BRIGHTNESS evening/night anchors so the
     # wind-down stays at a socially sane hour year-round, while Kelvin
-    # continues to follow the sun. They apply ONLY when "Use sun for
-    # anchors" is on; when sun mode is off the fixed clock anchors above
-    # are used as-is.
+    # continues to follow the sun.
     evening_earliest:
-      name: "Evening brightness: earliest clock time (sun mode)"
+      name: "Evening brightness: earliest clock time"
       description: >
         Sun-derived `evening` anchor for BRIGHTNESS is never earlier
         than this. Kelvin still tracks the raw sun. Use to stop early
@@ -278,7 +273,7 @@ blueprint:
       selector:
         time:
     evening_latest:
-      name: "Evening brightness: latest clock time (sun mode)"
+      name: "Evening brightness: latest clock time"
       description: >
         Sun-derived `evening` anchor for BRIGHTNESS is never later
         than this. Caps the start of the brightness wind-down on long
@@ -287,7 +282,7 @@ blueprint:
       selector:
         time:
     night_earliest:
-      name: "Night brightness: earliest clock time (sun mode)"
+      name: "Night brightness: earliest clock time"
       description: >
         Sun-derived `night` anchor for BRIGHTNESS is never earlier than
         this. Stops the deep dim "bedtime" brightness from triggering
@@ -296,7 +291,7 @@ blueprint:
       selector:
         time:
     night_latest:
-      name: "Night brightness: latest clock time (sun mode)"
+      name: "Night brightness: latest clock time"
       description: >
         Sun-derived `night` anchor for BRIGHTNESS is never later than
         this. Caps the bedtime brightness drop to a reasonable hour on
@@ -305,35 +300,20 @@ blueprint:
       selector:
         time:
 
-    pre_dawn_start:
-      name: Pre-dawn start (clock)
-      description: Used when "Use sun for anchors" is OFF.
-      default: "05:30:00"
-      selector:
-        time:
-    morning_start:
-      name: Morning start (clock)
-      default: "07:00:00"
-      selector:
-        time:
     midday_start:
-      name: Midday start
+      name: Midday start (clock)
+      description: >
+        Clock time for the `midday` anchor. The sun has no natural
+        anchor here, so this stays clock-based.
       default: "10:00:00"
       selector:
         time:
     afternoon_start:
-      name: Afternoon start
+      name: Afternoon start (clock)
+      description: >
+        Clock time for the `afternoon` anchor. The sun has no natural
+        anchor here, so this stays clock-based.
       default: "14:00:00"
-      selector:
-        time:
-    evening_start:
-      name: Evening start (clock)
-      default: "18:30:00"
-      selector:
-        time:
-    night_start:
-      name: Night start (clock)
-      default: "22:30:00"
       selector:
         time:
 
@@ -392,13 +372,8 @@ variables:
   downlight_label: !input downlight_label
   secondary_label: !input secondary_label
   default_class: !input default_class
-  pre_dawn_start: !input pre_dawn_start
-  morning_start: !input morning_start
   midday_start: !input midday_start
   afternoon_start: !input afternoon_start
-  evening_start: !input evening_start
-  night_start: !input night_start
-  use_sun_anchors: !input use_sun_anchors
   sun_entity: !input sun_entity
   sun_pre_dawn_offset: !input sun_pre_dawn_offset
   sun_morning_offset: !input sun_morning_offset
@@ -564,14 +539,11 @@ variables:
       night:     [2700, 60]
 
   # --- Time helpers ---
-  # Convert each clock anchor "HH:MM:SS" to minutes-since-midnight.
-  pre_dawn_clock_min:  "{{ (pre_dawn_start.split(':')[0]  | int) * 60 + (pre_dawn_start.split(':')[1]  | int) }}"
-  morning_clock_min:   "{{ (morning_start.split(':')[0]   | int) * 60 + (morning_start.split(':')[1]   | int) }}"
-  midday_min:          "{{ (midday_start.split(':')[0]    | int) * 60 + (midday_start.split(':')[1]    | int) }}"
-  afternoon_min:       "{{ (afternoon_start.split(':')[0] | int) * 60 + (afternoon_start.split(':')[1] | int) }}"
-  evening_clock_min:   "{{ (evening_start.split(':')[0]   | int) * 60 + (evening_start.split(':')[1]   | int) }}"
-  night_clock_min:     "{{ (night_start.split(':')[0]     | int) * 60 + (night_start.split(':')[1]     | int) }}"
-  # Seasonal-clamp clock times (sun mode only).
+  # midday and afternoon are the only clock-based anchors; the rest
+  # come from sun.sun.
+  midday_min:    "{{ (midday_start.split(':')[0]    | int) * 60 + (midday_start.split(':')[1]    | int) }}"
+  afternoon_min: "{{ (afternoon_start.split(':')[0] | int) * 60 + (afternoon_start.split(':')[1] | int) }}"
+  # Brightness clamp clock times (sun-derived evening/night only).
   evening_earliest_min: "{{ (evening_earliest.split(':')[0] | int) * 60 + (evening_earliest.split(':')[1] | int) }}"
   evening_latest_min:   "{{ (evening_latest.split(':')[0]   | int) * 60 + (evening_latest.split(':')[1]   | int) }}"
   night_earliest_min:   "{{ (night_earliest.split(':')[0]   | int) * 60 + (night_earliest.split(':')[1]   | int) }}"
@@ -580,79 +552,63 @@ variables:
 
   # Sun-derived minutes-of-day. We extract the local time-of-day from
   # the `next_*` timestamps; which calendar day they fall on doesn't
-  # matter (dawn/dusk drift by only seconds day-to-day).
+  # matter (dawn/dusk drift by only seconds day-to-day). If the
+  # attribute is momentarily unavailable, fall back to a sensible
+  # hardcoded constant (Sydney-ish; rarely used).
   sun_dawn_min: >-
     {%- set v = state_attr(sun_entity, 'next_dawn') -%}
     {%- if v is not none -%}
       {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
       {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
-    {%- else -%}-1{%- endif -%}
+    {%- else -%}330{%- endif -%}
   sun_rising_min: >-
     {%- set v = state_attr(sun_entity, 'next_rising') -%}
     {%- if v is not none -%}
       {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
       {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
-    {%- else -%}-1{%- endif -%}
+    {%- else -%}390{%- endif -%}
   sun_setting_min: >-
     {%- set v = state_attr(sun_entity, 'next_setting') -%}
     {%- if v is not none -%}
       {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
       {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
-    {%- else -%}-1{%- endif -%}
+    {%- else -%}1110{%- endif -%}
   sun_dusk_min: >-
     {%- set v = state_attr(sun_entity, 'next_dusk') -%}
     {%- if v is not none -%}
       {%- set lt = as_timestamp(v) | timestamp_custom('%H:%M', true) -%}
       {{ (lt.split(':')[0] | int) * 60 + (lt.split(':')[1] | int) }}
-    {%- else -%}-1{%- endif -%}
+    {%- else -%}1140{%- endif -%}
 
-  # Effective anchors. When sun mode is on AND the relevant attribute is
-  # available, derive from the sun and apply the per-anchor offset.
-  # Otherwise fall back to the clock anchor.
+  # Effective anchors. pre_dawn / morning / evening / night are always
+  # sun-derived (with per-anchor offsets). midday and afternoon stay
+  # clock-based.
   pre_dawn_min: >-
-    {{ (((sun_dawn_min | int) + (sun_pre_dawn_offset | int)) % 1440)
-       if use_sun_anchors and (sun_dawn_min | int) >= 0
-       else (pre_dawn_clock_min | int) }}
+    {{ ((sun_dawn_min   | int) + (sun_pre_dawn_offset | int)) % 1440 }}
   morning_min: >-
-    {{ (((sun_rising_min | int) + (sun_morning_offset | int)) % 1440)
-       if use_sun_anchors and (sun_rising_min | int) >= 0
-       else (morning_clock_min | int) }}
-  # Sun-derived raw values (before any clamp).
+    {{ ((sun_rising_min | int) + (sun_morning_offset  | int)) % 1440 }}
+  # Sun-derived raw values (before any brightness clamp).
   evening_sun_raw: >-
     {{ ((sun_setting_min | int) + (sun_evening_offset | int)) % 1440 }}
   night_sun_raw: >-
-    {{ ((sun_dusk_min | int) + (sun_night_offset | int)) % 1440 }}
+    {{ ((sun_dusk_min    | int) + (sun_night_offset   | int)) % 1440 }}
 
-  # --- KELVIN anchors: raw sun position, no seasonal clamp. ---
-  # Best-practice circadian response: warm light should arrive with the
+  # --- KELVIN anchors: raw sun position, no clamp. ---
+  # Best-practice circadian response: warm light arrives with the
   # actual sunset, regardless of clock.
-  evening_min_k: >-
-    {{ (evening_sun_raw | int)
-       if use_sun_anchors and (sun_setting_min | int) >= 0
-       else (evening_clock_min | int) }}
-  night_min_k: >-
-    {{ (night_sun_raw | int)
-       if use_sun_anchors and (sun_dusk_min | int) >= 0
-       else (night_clock_min | int) }}
+  evening_min_k: "{{ evening_sun_raw | int }}"
+  night_min_k:   "{{ night_sun_raw   | int }}"
 
   # --- BRIGHTNESS anchors: sun-derived but clamped between the
   # configured earliest/latest clock floors/ceilings, so the dim-down
   # doesn't kick in mid-afternoon in winter or push past midnight in
   # summer. Kelvin and brightness are interpolated independently. ---
   evening_min_b: >-
-    {%- if use_sun_anchors and (sun_setting_min | int) >= 0 -%}
-      {{ [[evening_sun_raw | int, evening_earliest_min | int] | max,
-          evening_latest_min | int] | min }}
-    {%- else -%}
-      {{ evening_clock_min | int }}
-    {%- endif -%}
+    {{ [[evening_sun_raw | int, evening_earliest_min | int] | max,
+        evening_latest_min | int] | min }}
   night_min_b: >-
-    {%- if use_sun_anchors and (sun_dusk_min | int) >= 0 -%}
-      {{ [[night_sun_raw | int, night_earliest_min | int] | max,
-          night_latest_min | int] | min }}
-    {%- else -%}
-      {{ night_clock_min | int }}
-    {%- endif -%}
+    {{ [[night_sun_raw   | int, night_earliest_min   | int] | max,
+        night_latest_min   | int] | min }}
 
   # Area -> room-type mapping driven by the inputs.
   area_to_room:

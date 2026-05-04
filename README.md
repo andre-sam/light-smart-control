@@ -51,14 +51,15 @@ lights* input.
   Dining, Office/Study, Hallway. Each comes with sensible Kelvin +
   brightness values for every slot.
 - **Six daily anchors** — `pre_dawn`, `morning`, `midday`, `afternoon`,
-  `evening`, `night`, with configurable times. Kelvin and brightness
-  are **linearly interpolated** between anchors, so changes are smooth
-  rather than stepped at each boundary. Overnight wrap is handled.
-- **Sun-aware anchors** — optionally derive `pre_dawn`, `morning`,
-  `evening` and `night` from `sun.sun` (`next_dawn`, `next_rising`,
-  `next_setting`, `next_dusk`) plus per-anchor offsets, so the schedule
-  shifts with the seasons. `midday`/`afternoon` stay clock-based.
-- **Decoupled Kelvin & brightness scheduling** — when sun mode is on,
+  `evening`, `night`. Kelvin and brightness are **linearly
+  interpolated** between anchors, so changes are smooth rather than
+  stepped at each boundary. Overnight wrap is handled.
+- **Sun-driven schedule** — `pre_dawn`, `morning`, `evening` and
+  `night` are derived from `sun.sun` (`next_dawn`, `next_rising`,
+  `next_setting`, `next_dusk`) plus per-anchor offsets, so the
+  schedule shifts with the seasons automatically. `midday` and
+  `afternoon` are clock-based (the sun has no natural anchor for them).
+- **Decoupled Kelvin & brightness scheduling** —
   **Kelvin tracks the raw sun position** (best-practice circadian
   response: warm light arrives with the actual sunset, regardless of
   clock), while **brightness uses configurable clock floors/ceilings**
@@ -179,6 +180,11 @@ Lights without either label fall back to *Default fixture class*
   Tradfri, Shelly RGBW, Tuya CCT, Zigbee2MQTT, etc.) qualify.
 - Each light must be assigned to an **Area** in Home Assistant.
 - One `input_boolean` to act as the master enable toggle.
+- A **sun entity** (`sun.*`). Home Assistant ships with `sun.sun` out
+  of the box once you've configured your home location, so this is
+  almost always already satisfied. The blueprint defaults to `sun.sun`
+  but lets you pick a different sun entity if you maintain a custom
+  one.
 
 ## Installation
 
